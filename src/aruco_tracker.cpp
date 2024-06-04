@@ -78,6 +78,7 @@ class ArucoTracker : public rclcpp_lifecycle::LifecycleNode
   rclcpp::Time last_msg_stamp_;
   bool cam_info_retrieved_ = false;
   rclcpp::Time callback_start_time_;
+  bool new_aruco_params_ = false;
 
   // Aruco
   cv::Mat camera_matrix_;
@@ -109,7 +110,11 @@ public:
   {
     RCLCPP_INFO(get_logger(), "Configuring");
 
+    #if CV_VERSION_MAJOR > 4 || CV_VERSION_MAJOR == 4 && CV_VERSION_MINOR >= 7
+    detector_parameters_ = cv::makePtr<cv::aruco::DetectorParameters>();
+    #else
     detector_parameters_ = cv::aruco::DetectorParameters::create();
+    #endif
 
     retrieve_parameters();
 
@@ -118,7 +123,13 @@ public:
       return LifecycleNodeInterface::CallbackReturn::FAILURE;
     }
 
+    #if CV_VERSION_MAJOR > 4 || CV_VERSION_MAJOR == 4 && CV_VERSION_MINOR >= 7
+    dictionary_ = cv::makePtr<cv::aruco::Dictionary>(
+      cv::aruco::getPredefinedDictionary(
+        ARUCO_DICT_MAP.at(marker_dict_)));
+    #else
     dictionary_ = cv::aruco::getPredefinedDictionary(ARUCO_DICT_MAP.at(marker_dict_));
+    #endif
 
     if (!board_descriptions_path_.empty()) {
       load_boards();
@@ -216,6 +227,7 @@ public:
     detector_parameters_.reset();
     detection_pub_.reset();
     debug_pub_.reset();
+    boards_.clear();
 
     return LifecycleNodeInterface::CallbackReturn::SUCCESS;
   }
@@ -231,9 +243,11 @@ public:
     tf_listener_.reset();
     tf_buffer_.reset();
     tf_broadcaster_.reset();
+    dictionary_.reset();
     detector_parameters_.reset();
     detection_pub_.reset();
     debug_pub_.reset();
+    boards_.clear();
 
     return LifecycleNodeInterface::CallbackReturn::SUCCESS;
   }
@@ -316,13 +330,12 @@ protected:
       }
     }
 
-    bool aruco_param_changed = false;
     for (auto & param : parameters) {
       if (param.get_name() == "marker_size") {
         marker_size_ = param.as_double();
         update_marker_obj_points();
       } else if (param.get_name().rfind("aruco", 0) == 0) {
-        aruco_param_changed = true;
+        new_aruco_params_ = true;
       } else {
         // Unknown parameter, ignore
         continue;
@@ -332,12 +345,6 @@ protected:
         get_logger(),
         "Parameter \"" << param.get_name() << "\" changed to " << param.value_to_string());
     }
-
-    if (!aruco_param_changed) {
-      return result;
-    }
-
-    retrieve_aruco_parameters(*this, detector_parameters_);
 
     return result;
   }
@@ -368,20 +375,42 @@ protected:
         const int markers_y = desc["markers_y"].as<int>();
         const double marker_size = desc["marker_size"].as<double>();
         const double separation = desc["separation"].as<double>();
+        const int first_id = desc["first_id"].as<int>();
 
-        auto board = cv::aruco::GridBoard::create(
-          markers_x, markers_y, marker_size, separation,
-          dictionary_, desc["first_id"].as<int>());
+        #if CV_VERSION_MAJOR > 4 || CV_VERSION_MAJOR == 4 && CV_VERSION_MINOR >= 7
+        std::vector<int> ids(markers_x * markers_y);
+        std::iota(ids.begin(), ids.end(), first_id);
+        cv::Ptr<cv::aruco::Board> board = cv::makePtr<cv::aruco::GridBoard>(
+          cv::Size(markers_x, markers_y), marker_size, separation, *dictionary_, ids);
+        #else
+        cv::Ptr<cv::aruco::Board> board = cv::aruco::GridBoard::create(
+          markers_x, markers_y, marker_size, separation, dictionary_, first_id);
+        #endif
 
         if (frame_at_center) {
           double offset_x = (markers_x * (marker_size + separation) - separation) / 2.0;
           double offset_y = (markers_y * (marker_size + separation) - separation) / 2.0;
-          for (auto & obj : board->objPoints) {
+
+          #if CV_VERSION_MAJOR > 4 || CV_VERSION_MAJOR == 4 && CV_VERSION_MINOR >= 7
+          std::vector<std::vector<cv::Point3f>> obj_points(board->getObjPoints());
+          #else
+          std::vector<std::vector<cv::Point3f>> obj_points(board->objPoints);
+          #endif
+
+          for (auto & obj : obj_points) {
             for (auto & point : obj) {
               point.x -= offset_x;
               point.y -= offset_y;
             }
           }
+
+          // Create a new board with all the object point offsetted so that point (0,0)
+          // is at the center of the board
+          #if CV_VERSION_MAJOR > 4 || CV_VERSION_MAJOR == 4 && CV_VERSION_MINOR >= 7
+          board = cv::makePtr<cv::aruco::Board>(obj_points, *dictionary_, ids);
+          #else
+          board = cv::aruco::Board::create(obj_points, dictionary_, board->ids);
+          #endif
         }
 
         boards_.push_back(std::make_pair(name, board));
@@ -389,7 +418,7 @@ protected:
         RCLCPP_ERROR_STREAM(get_logger(), "Failed to load board '" << name << "': " << e.what());
         continue;
       }
-      RCLCPP_ERROR_STREAM(
+      RCLCPP_INFO_STREAM(
         get_logger(), "Successfully loaded configuration for board '" << name << "'");
     }
   }
@@ -472,6 +501,11 @@ protected:
 
   void process_image(const cv_bridge::CvImageConstPtr & cv_ptr)
   {
+    if (new_aruco_params_) {
+      new_aruco_params_ = false;
+      retrieve_aruco_parameters(*this, detector_parameters_);
+    }
+
     std::vector<int> marker_ids;
     std::vector<std::vector<cv::Point2f>> marker_corners;
 
