@@ -1,3 +1,4 @@
+release_repo_url: git@github.com:revyos-ros/aruco_opencv-release.git
 tracks:
   foxy:
     actions:
