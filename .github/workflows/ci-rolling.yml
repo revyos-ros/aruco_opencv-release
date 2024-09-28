@@ -1,21 +1,22 @@
-name: CI-Humble
+name: CI-Rolling
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - humble
+      - ros2
   pull_request:
     branches:
-      - humble
+      - ros2
 
 env:
- ROS_DISTRO: humble
+ ROS_DISTRO: rolling
 
 jobs:
   industrial_ci:
     runs-on: ubuntu-20.04
     strategy:
+      fail-fast: false
       matrix:
         ROS_REPO: [testing, main]
     env:
@@ -25,4 +26,3 @@ jobs:
         uses: actions/checkout@v3
       - name: Source tests
         uses: "ros-industrial/industrial_ci@master"
-

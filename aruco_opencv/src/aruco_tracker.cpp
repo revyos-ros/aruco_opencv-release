@@ -28,8 +28,7 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
-
-#include "cv_bridge/cv_bridge.h"
+#include "cv_bridge/cv_bridge.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_listener.h"
@@ -69,6 +68,7 @@ class ArucoTracker : public rclcpp_lifecycle::LifecycleNode
 
   // ROS
   OnSetParametersCallbackHandle::SharedPtr on_set_parameter_callback_handle_;
+  PostSetParametersCallbackHandle::SharedPtr post_set_parameter_callback_handle_;
   rclcpp_lifecycle::LifecyclePublisher<aruco_opencv_msgs::msg::ArucoDetection>::SharedPtr
     detection_pub_;
   rclcpp_lifecycle::LifecyclePublisher<sensor_msgs::msg::Image>::SharedPtr debug_pub_;
@@ -78,7 +78,6 @@ class ArucoTracker : public rclcpp_lifecycle::LifecycleNode
   rclcpp::Time last_msg_stamp_;
   bool cam_info_retrieved_ = false;
   rclcpp::Time callback_start_time_;
-  bool new_aruco_params_ = false;
 
   // Aruco
   cv::Mat camera_matrix_;
@@ -124,8 +123,7 @@ public:
     }
 
     #if CV_VERSION_MAJOR > 4 || CV_VERSION_MAJOR == 4 && CV_VERSION_MINOR >= 7
-    dictionary_ = cv::makePtr<cv::aruco::Dictionary>(
-      cv::aruco::getPredefinedDictionary(
+    dictionary_ = cv::makePtr<cv::aruco::Dictionary>(cv::aruco::getPredefinedDictionary(
         ARUCO_DICT_MAP.at(marker_dict_)));
     #else
     dictionary_ = cv::aruco::getPredefinedDictionary(ARUCO_DICT_MAP.at(marker_dict_));
@@ -162,11 +160,10 @@ public:
     detection_pub_->on_activate();
     debug_pub_->on_activate();
 
-    on_set_parameter_callback_handle_ =
-      add_on_set_parameters_callback(
-      std::bind(
-        &ArucoTracker::callback_on_set_parameters,
-        this, std::placeholders::_1));
+    on_set_parameter_callback_handle_ = add_on_set_parameters_callback(
+      std::bind(&ArucoTracker::callback_on_set_parameters, this, std::placeholders::_1));
+    post_set_parameter_callback_handle_ = add_post_set_parameters_callback(
+      std::bind(&ArucoTracker::callback_post_set_parameters, this, std::placeholders::_1));
 
     RCLCPP_INFO(get_logger(), "Waiting for first camera info...");
 
@@ -206,6 +203,7 @@ public:
     RCLCPP_INFO(get_logger(), "Deactivating");
 
     on_set_parameter_callback_handle_.reset();
+    post_set_parameter_callback_handle_.reset();
     cam_info_sub_.reset();
     img_sub_.reset();
     compressed_img_sub_.reset();
@@ -237,6 +235,7 @@ public:
     RCLCPP_INFO(get_logger(), "Shutting down");
 
     on_set_parameter_callback_handle_.reset();
+    post_set_parameter_callback_handle_.reset();
     cam_info_sub_.reset();
     img_sub_.reset();
     compressed_img_sub_.reset();
@@ -330,12 +329,18 @@ protected:
       }
     }
 
+    return result;
+  }
+
+  void callback_post_set_parameters(const std::vector<rclcpp::Parameter> & parameters)
+  {
+    bool aruco_param_changed = false;
     for (auto & param : parameters) {
       if (param.get_name() == "marker_size") {
         marker_size_ = param.as_double();
         update_marker_obj_points();
       } else if (param.get_name().rfind("aruco", 0) == 0) {
-        new_aruco_params_ = true;
+        aruco_param_changed = true;
       } else {
         // Unknown parameter, ignore
         continue;
@@ -346,7 +351,9 @@ protected:
         "Parameter \"" << param.get_name() << "\" changed to " << param.value_to_string());
     }
 
-    return result;
+    if (aruco_param_changed) {
+      retrieve_aruco_parameters(*this, detector_parameters_);
+    }
   }
 
   void load_boards()
@@ -501,11 +508,6 @@ protected:
 
   void process_image(const cv_bridge::CvImageConstPtr & cv_ptr)
   {
-    if (new_aruco_params_) {
-      new_aruco_params_ = false;
-      retrieve_aruco_parameters(*this, detector_parameters_);
-    }
-
     std::vector<int> marker_ids;
     std::vector<std::vector<cv::Point2f>> marker_corners;
 
