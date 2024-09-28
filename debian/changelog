@@ -1,0 +1,61 @@
+ros-jazzy-aruco-opencv-msgs (6.0.1-1noble) noble; urgency=high
+
+
+
+ -- Fictionlab <support@fictionlab.pl>  Mon, 03 Jun 2024 16:00:00 -0000
+
+ros-jazzy-aruco-opencv-msgs (6.0.0-1noble) noble; urgency=high
+
+
+
+ -- Fictionlab <support@fictionlab.pl>  Tue, 07 May 2024 16:00:00 -0000
+
+ros-jazzy-aruco-opencv-msgs (4.2.0-1noble) noble; urgency=high
+
+
+
+ -- Fictionlab <support@fictionlab.pl>  Thu, 04 Apr 2024 16:00:00 -0000
+
+ros-jazzy-aruco-opencv-msgs (4.1.1-1noble) noble; urgency=high
+
+
+
+ -- Fictionlab <support@fictionlab.pl>  Wed, 17 May 2023 16:00:00 -0000
+
+ros-jazzy-aruco-opencv-msgs (4.1.0-1noble) noble; urgency=high
+
+  * Add board detection (ROS2) (#16 <https://github.com/fictionlab/ros_aruco_opencv/issues/16>)
+    * Add BoardPose msg, change MarkerDetection to ArucoDetection
+  * Add ament_lint tests to cmakelists instead of github workflows (#7 <https://github.com/fictionlab/ros_aruco_opencv/issues/7>)
+  * Contributors: Błażej Sowa
+
+ -- Fictionlab <support@fictionlab.pl>  Tue, 21 Feb 2023 16:00:00 -0000
+
+ros-jazzy-aruco-opencv-msgs (4.0.1-1noble) noble; urgency=high
+
+  * Fix package dependencies
+  * Contributors: Błażej Sowa
+
+ -- Fictionlab <support@fictionlab.pl>  Mon, 12 Dec 2022 16:00:00 -0000
+
+ros-jazzy-aruco-opencv-msgs (4.0.0-1noble) noble; urgency=high
+
+  * Initial port for ROS2 Foxy
+  * Contributors: Błażej Sowa
+
+ -- Fictionlab <support@fictionlab.pl>  Sun, 11 Dec 2022 16:00:00 -0000
+
+ros-jazzy-aruco-opencv-msgs (0.2.0-1noble) noble; urgency=high
+
+  * Move message definitions to aruco_opencv_msgs package (#2 <https://github.com/fictionlab/aruco_opencv/issues/2>)
+  * Contributors: Błażej Sowa
+
+ -- Fictionlab <support@fictionlab.pl>  Tue, 06 Sep 2022 16:00:00 -0000
+
+ros-jazzy-aruco-opencv-msgs (0.1.0-1noble) noble; urgency=high
+
+
+
+ -- Fictionlab <support@fictionlab.pl>  Wed, 06 Jul 2022 16:00:00 -0000
+
+
