@@ -2,6 +2,12 @@
 Changelog for package aruco_opencv
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+6.0.1 (2024-06-04)
+------------------
+* Fix out of bounds indexes when retrieving camera matrix for rectified images (`#47 <https://github.com/fictionlab/ros_aruco_opencv/issues/47>`_)
+  * Add image_is_rectified parameter to example yaml config
+* Contributors: Błażej Sowa, Sandip Das
+
 6.0.0 (2024-05-08)
 ------------------
 * Use post-set parameters callback (`#41 <https://github.com/fictionlab/ros_aruco_opencv/issues/41>`_)
